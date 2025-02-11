@@ -1,5 +1,6 @@
 mod server;
 mod client;
+use std::io::Write;
 use std::sync::mpsc;
 use std::{env, thread};
 use server::{listen_server, Message};
@@ -13,14 +14,18 @@ fn main() {
         }
     });
 
-    thread::spawn(move || {
-        while let Ok(msg) = rx.recv() {
-            println!("Received message from {}: {}", msg.username, msg.message);
-        }
-    });
+    // thread::spawn(move || {
+    //     while let Ok(msg) = rx.recv() {
+    //         println!("Received message from {}: {}", msg.username, msg.message);
+    //     }
+    // });
 
     // Ratatui UI here
-    loop {}
+        // Start message listener
+    spawn_message_listener(rx);
+
+    // Start user input loop
+    user_input_loop();
 }
 
 /// Parses the command-line arguments and extracts a valid port number.
@@ -43,3 +48,43 @@ fn get_port_from_args() -> usize {
         })
 }
 
+fn user_input_loop() {
+    loop {
+        print!("Enter target IP:PORT (or 'exit' to quit): ");
+        std::io::stdout().flush().unwrap();
+        
+        let mut address = String::new();
+        std::io::stdin().read_line(&mut address).unwrap();
+        let address = address.trim();
+        if address.eq_ignore_ascii_case("exit") {
+            break;
+        }
+
+        print!("Enter your username: ");
+        std::io::stdout().flush().unwrap();
+        let mut username = String::new();
+        std::io::stdin().read_line(&mut username).unwrap();
+        
+        print!("Enter your message: ");
+        std::io::stdout().flush().unwrap();
+        let mut message = String::new();
+        std::io::stdin().read_line(&mut message).unwrap();
+
+        let msg = Message {
+            username: username.trim().to_string(),
+            message: message.trim().to_string(),
+        };
+
+        if let Err(e) = client::send_message(address, msg) {
+            eprintln!("❌ Failed to send message: {}", e);
+        }
+    }
+}
+
+fn spawn_message_listener(rx: mpsc::Receiver<Message>) {
+    thread::spawn(move || {
+        for msg in rx {
+            println!("\n📩 New message from {}: {}\n", msg.username, msg.message);
+        }
+    });
+}
