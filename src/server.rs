@@ -18,15 +18,18 @@ async fn receive_message(
     HttpResponse::Ok().body("Message received")
 }
 
-pub fn listen_server(tx: Sender<Message>) -> std::io::Result<()> {
+pub fn listen_server(tx: Sender<Message>, port: usize) -> std::io::Result<()> {
+    let address = format!("0.0.0.0:{}", port);
+    
     let server = HttpServer::new(move || {
         App::new()
             .app_data(web::Data::new(tx.clone()))
             .route("/message", web::post().to(receive_message))
     })
-    .bind("127.0.0.1:8080")?
+    .bind(&address)?
     .run();
 
+    println!("Server listening on {}", address);
+    
     actix_web::rt::System::new().block_on(server)
 }
-
