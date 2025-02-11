@@ -1,4 +1,4 @@
-use actix_web::{App, HttpResponse, HttpServer, Responder, web};
+use actix_web::{post, web, App, HttpResponse, HttpServer, Responder};
 use serde_derive::{Deserialize, Serialize};
 use std::sync::mpsc::Sender;
 
@@ -8,6 +8,7 @@ pub struct Message {
     pub message: String,
 }
 
+#[post("/message")]
 async fn receive_message(
     msg: web::Json<Message>,
     sender: web::Data<Sender<Message>>,
@@ -24,7 +25,7 @@ pub fn listen_server(tx: Sender<Message>, port: usize) -> std::io::Result<()> {
     let server = HttpServer::new(move || {
         App::new()
             .app_data(web::Data::new(tx.clone()))
-            .route("/message", web::post().to(receive_message))
+            .service(receive_message)
     })
     .bind(&address)?
     .run();
