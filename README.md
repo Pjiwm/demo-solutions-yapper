@@ -8,7 +8,7 @@ die al is gegeven,
 waarmee de gebruiker berichten kan versturen en ontvangen in de terminal.
 Probeer zo veel mogelijk zelf te typen! Geen copy-paste.
 
-## 1: Web server
+## Deel 1: Web server
 
 ### Stap 0: Voeg de afhankelijkheden toe aan `Cargo.toml`
 Open het bestand Cargo.toml en voeg de volgende afhankelijkheden toe:
@@ -29,7 +29,7 @@ Dit struct bevat twee velden: username en message, die we van de client zullen o
 Achter de puntjes volgen de missende fields. Bij derive missen: Serialize, Deserialize en Clone.
 Dit zijn 'interfaces' die het Message struct verstuurbaar maken.
 
-```
+```rs
 use actix_web::{post, web, App, HttpResponse, HttpServer, Responder};
 use serde_derive::{Deserialize, Serialize};
 use std::sync::mpsc::Sender;
@@ -66,7 +66,7 @@ async fn receive_message(
 Nu gaan we de server bouwen die luistert naar inkomende verbindingen.
 De server maakt gebruik van de HttpServer van Actix-web 
 en maakt een route aan voor de POST-request naar /message.
-```
+```rs
 pub fn listen_server(tx: Sender<Message>, port: usize) -> std::io::Result<()> {
     // De serveradres en poort
     let address = format!("0.0.0.0:{}", port);
@@ -89,7 +89,7 @@ In `main.rs` starten we de server in een nieuw thread met thread::spawn.
 Dit zorgt ervoor dat de server onafhankelijk van de hoofdthread kan draaien.
 In de thread wordt de listen_server functie aangeroepen 
 met de tx (sender) en de poort die uit de argumenten komt.
-```
+```rs
     let (tx, rx): (mpsc::Sender<Message>, mpsc::Receiver<Message>) = mpsc::channel();
     let port = get_port_from_args();
     thread::spawn(move || {
@@ -103,6 +103,8 @@ met de tx (sender) en de poort die uit de argumenten komt.
 ```rs
     let mut app = tui::App::new("Ferris".to_string());
 ```
+
+## Deel 1: Client
 
 ### Stap 6: Verstuur een bericht naar de server
 Open het bestand Cargo.toml en voeg de volgende afhankelijkheden toe:
