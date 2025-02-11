@@ -1585,20 +1585,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "rs_demo"
-version = "0.1.0"
-dependencies = [
- "actix-web",
- "crossterm",
- "local-ip-address",
- "ratatui",
- "reqwest",
- "serde",
- "serde_derive",
- "serde_json",
-]
-
-[[package]]
 name = "rustc-demangle"
 version = "0.1.24"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2471,6 +2457,20 @@ name = "writeable"
 version = "0.5.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1e9df38ee2d2c3c5948ea468a8406ff0db0b29ae1ffde1bcf20ef305bcc95c51"
+
+[[package]]
+name = "yapper-solution"
+version = "0.1.0"
+dependencies = [
+ "actix-web",
+ "crossterm",
+ "local-ip-address",
+ "ratatui",
+ "reqwest",
+ "serde",
+ "serde_derive",
+ "serde_json",
+]
 
 [[package]]
 name = "yoke"

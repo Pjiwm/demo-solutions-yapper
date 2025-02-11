@@ -1,7 +1,8 @@
 [package]
-name = "rs_demo"
+name = "yapper-solution"
 version = "0.1.0"
 edition = "2021"
+authors = ["Pjiwm", "TeaDrinkingProgrammer"]
 
 [dependencies]
 actix-web = "4"
