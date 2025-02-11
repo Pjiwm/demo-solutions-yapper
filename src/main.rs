@@ -1,5 +1,6 @@
 mod server;
 mod client;
+mod tui;
 use std::io::Write;
 use std::sync::mpsc;
 use std::{env, thread};
@@ -13,27 +14,18 @@ fn main() {
             eprintln!("Server failed: {}", e);
         }
     });
-
-    // thread::spawn(move || {
-    //     while let Ok(msg) = rx.recv() {
-    //         println!("Received message from {}: {}", msg.username, msg.message);
-    //     }
-    // });
-
-    // Ratatui UI here
-        // Start message listener
-    spawn_message_listener(rx);
-
-    // Start user input loop
-    user_input_loop();
+    let mut app = tui::App::new("Bruh".to_string());
+    if let Err(err) = app.run(rx) {
+        println!("{err}");
+    }
 }
 
 /// Parses the command-line arguments and extracts a valid port number.
 /// Defaults to 8080 if no valid port is provided.
 fn get_port_from_args() -> usize {
     env::args()
-        .collect::<Vec<_>>() // Collect arguments into a Vec for easy windowing
-        .windows(2) // Look at each pair of arguments
+        .collect::<Vec<_>>() 
+        .windows(2) 
         .find_map(|args| {
             if args[0] == "--port" {
                 args.get(1)?.parse::<usize>().ok()
@@ -41,7 +33,7 @@ fn get_port_from_args() -> usize {
                 None
             }
         })
-        .filter(|&port| (1024..=65535).contains(&port)) // Ensure port is in a valid range
+        .filter(|&port| (1024..=65535).contains(&port)) 
         .unwrap_or_else(|| {
             eprintln!("Invalid or missing port. Using default: 8080");
             8080

@@ -28,8 +28,6 @@ pub fn listen_server(tx: Sender<Message>, port: usize) -> std::io::Result<()> {
     })
     .bind(&address)?
     .run();
-
-    println!("Server listening on {}", address);
     
     actix_web::rt::System::new().block_on(server)
 }
