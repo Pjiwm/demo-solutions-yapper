@@ -92,8 +92,9 @@ met de tx (sender) en de poort die uit de argumenten komt.
 ```rs
     let (tx, rx): (mpsc::Sender<Message>, mpsc::Receiver<Message>) = mpsc::channel();
     let port = get_port_from_args();
+    let tx_clone = tx.clone();
     thread::spawn(move || {
-        if let Err(e) = listen_server(tx, port) {
+        if let Err(e) = listen_server(tx_clone, port) {
             eprintln!("Server failed: {}", e);
         }
     });
@@ -101,7 +102,7 @@ met de tx (sender) en de poort die uit de argumenten komt.
 
 ### Stap 5: Kies een gebruikersnaam
 ```rs
-    let mut app = tui::App::new("Ferris".to_string());
+    let mut app = tui::App::new("Ferris".to_string(), format!("{}:{}", ip_address, port));
 ```
 
 ## Deel 1: Client
@@ -133,9 +134,10 @@ pub fn send_message(address: &str, msg: Message) -> Result<(), reqwest::Error> {
 
     // Verstuur het POST-verzoek met het bericht als JSON
     let res = client
-        .post(api_url)        // POST-aanroep naar de server
-        .json(&msg)           // Zet het bericht om naar JSON
-        .send()?;             // Verstuur het verzoek
+        .post(api_url)                       // POST-aanroep naar de server
+        .json(&msg)                          // Zet het bericht om naar JSON
+        .timeout(Duration::from_millis(800)) // Timeout na 800ms.
+        .send()?;                            // Verstuur het verzoek
 
     // Print de response van de server
     println!("Response: {:?}", res.text()?);
