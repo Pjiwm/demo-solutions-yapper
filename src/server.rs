@@ -13,7 +13,10 @@ async fn receive_message(
     sender: web::Data<Sender<Message>>,
 ) -> impl Responder {
     if let Err(e) = sender.send(msg.into_inner()) {
-        eprintln!("Failed to send message: {}", e);
+        sender.send(Message {
+            username: "Server".to_string(),
+            message: format!("Server: Failed to send message: {}", e)
+        }).expect("Error sending message to messages listener");
     }
     HttpResponse::Ok().body("Message received")
 }

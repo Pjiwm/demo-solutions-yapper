@@ -3,15 +3,22 @@ use crossterm::{
     event::{self, KeyCode, KeyEvent},
     execute, terminal,
 };
-use ratatui::{prelude::*, widgets::*};
-use std::{io, sync::mpsc::Receiver};
+use ratatui::{
+    prelude::*,
+    widgets::*,
+    style::{Style, Color},
+};
+use std::{io, sync::mpsc::Receiver, time::{Instant, Duration}};
 
 pub struct App {
     pub username: String,
     pub input: String,
     pub address: String,
+    pub ip_address: String,
     pub messages: Vec<Message>,
     pub focus: Focus,
+    pub last_blink: Instant,
+    pub blink_visible: bool,
 }
 
 #[derive(Debug, PartialEq)]
@@ -21,17 +28,20 @@ pub enum Focus {
 }
 
 impl App {
-    pub fn new(username: String) -> Self {
+    pub fn new(username: String, ip_address: String) -> Self {
         Self {
             username,
             input: String::new(),
             address: String::new(),
+            ip_address,
             messages: Vec::new(),
             focus: Focus::Address, // Start with address input
+            last_blink: Instant::now(),
+            blink_visible: true,
         }
     }
 
-    pub fn run(&mut self, rx: Receiver<Message>) -> io::Result<()> {
+    pub fn run(&mut self, rx: Receiver<Message>, tx: std::sync::mpsc::Sender<Message>) -> io::Result<()> {
         let mut stdout = io::stdout();
         execute!(stdout, terminal::Clear(terminal::ClearType::All))?;
         let backend = CrosstermBackend::new(stdout);
@@ -39,14 +49,20 @@ impl App {
 
         terminal::enable_raw_mode()?;
         loop {
+            let now = Instant::now();
+            if now.duration_since(self.last_blink) >= Duration::from_millis(500) {
+                self.blink_visible = !self.blink_visible;
+                self.last_blink = now;
+            }
+
             terminal.draw(|f| self.ui(f))?;
 
-            if event::poll(std::time::Duration::from_millis(100))? {
-                if let event::Event::Key(KeyEvent { code, .. }) = event::read()? {
+            if event::poll(Duration::from_millis(100))? {
+                if let event::Event::Key(KeyEvent { code, modifiers, .. }) = event::read()? {
                     match code {
                         KeyCode::Esc => break,
+                        KeyCode::Char('c') if modifiers.contains(event::KeyModifiers::CONTROL) => break,
                         KeyCode::Tab => {
-                            // Switch focus between address and input
                             self.focus = match self.focus {
                                 Focus::Address => Focus::Input,
                                 Focus::Input => Focus::Address,
@@ -56,31 +72,42 @@ impl App {
                             if self.focus == Focus::Input
                                 && !self.input.is_empty()
                                 && !self.address.is_empty()
-                            {
-                                let msg = Message {
-                                    username: self.username.clone(),
-                                    message: self.input.clone(),
-                                };
-                                if let Err(e) = crate::client::send_message(&self.address, msg) {
-                                    eprintln!("Failed to send: {}", e);
+                                {
+                                    let address = self.address.clone();
+                                    let msg = Message {
+                                        username: self.username.clone(),
+                                        message: self.input.clone(),
+                                    };
+                                    let tx_clone = tx.clone(); // Clone sender for thread use
+
+                                    std::thread::spawn(move || {
+                                        tx_clone.send(Message {
+                                            username: "Server".to_string(),
+                                            message: "Sending message...".to_string()
+                                        }).expect("Error putting message on message list");
+                                        match crate::client::send_message(&address, msg.clone()) {
+                                            Ok(_) => {
+                                                // Successfully sent message, send it to UI
+                                                let _ = tx_clone.send(msg);
+                                            }
+                                            Err(e) => {
+                                                // If there is an error, send an error message to UI
+                                                let _ = tx_clone.send(Message {
+                                                    username: "Server".to_string(),
+                                                                      message: format!("Failed to send: {}", e),
+                                                });
+                                            }
+                                        }
+                                    });
                                 }
-                                self.input.clear();
-                            }
                         }
-                        KeyCode::Char(c) => {
-                            // Input handling based on focus
-                            match self.focus {
-                                Focus::Address => self.address.push(c),
-                                Focus::Input => self.input.push(c),
-                            }
-                        }
+                        KeyCode::Char(c) => match self.focus {
+                            Focus::Address => self.address.push(c),
+                            Focus::Input => self.input.push(c),
+                        },
                         KeyCode::Backspace => match self.focus {
-                            Focus::Address => {
-                                self.address.pop();
-                            }
-                            Focus::Input => {
-                                self.input.pop();
-                            }
+                            Focus::Address => { self.address.pop(); }
+                            Focus::Input => { self.input.pop(); }
                         },
                         _ => {}
                     }
@@ -97,47 +124,68 @@ impl App {
 
     fn ui(&self, f: &mut Frame) {
         let chunks = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints([
-                Constraint::Length(3), // Address field
-                Constraint::Length(3), // Input field
-                Constraint::Min(0),    // Messages
-            ])
-            .split(f.area());
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(3), // IP Address field
+                     Constraint::Length(3), // Address field
+                     Constraint::Length(3), // Input field
+                     Constraint::Min(0),    // Messages
+        ])
+        .split(f.area());
 
-        let address_border = if self.focus == Focus::Address {
-            Borders::ALL
+        let cursor_symbol = if self.blink_visible { "|" } else { " " };
+
+        let address_text = if self.focus == Focus::Address {
+            format!("{}{}", self.address, cursor_symbol)
         } else {
-            Borders::ALL
+            self.address.clone()
         };
 
-        let input_border = if self.focus == Focus::Input {
-            Borders::ALL
+        let input_text = if self.focus == Focus::Input {
+            format!("{}{}", self.input, cursor_symbol)
         } else {
-            Borders::ALL
+            self.input.clone()
         };
 
-        let address = Paragraph::new(self.address.as_str()).block(
+        let ip_display = Paragraph::new(self.ip_address.clone()).block(
             Block::default()
-                .borders(address_border)
-                .title("Address (Tab to switch)"),
+            .borders(Borders::ALL)
+            .title("IP Address")
+            .border_style(Style::default().fg(Color::Green)),
         );
-        f.render_widget(address, chunks[0]);
+        f.render_widget(ip_display, chunks[0]);
 
-        let input = Paragraph::new(self.input.as_str()).block(
+        let address = Paragraph::new(address_text).block(
             Block::default()
-                .borders(input_border)
-                .title("Input (Tab to switch)"),
+            .borders(Borders::ALL)
+            .title("Address (Tab to switch)")
+            .border_style(if self.focus == Focus::Address {
+                Style::default().fg(Color::Cyan)
+            } else {
+                Style::default()
+            }),
         );
-        f.render_widget(input, chunks[1]);
+        f.render_widget(address, chunks[1]);
+
+        let input = Paragraph::new(input_text).block(
+            Block::default()
+            .borders(Borders::ALL)
+            .title("Input (Tab to switch)")
+            .border_style(if self.focus == Focus::Input {
+                Style::default().fg(Color::Cyan)
+            } else {
+                Style::default()
+            }),
+        );
+        f.render_widget(input, chunks[2]);
 
         let messages: Vec<ListItem> = self
-            .messages
-            .iter()
-            .map(|m| ListItem::new(format!("{}: {}", m.username, m.message)))
-            .collect();
+        .messages
+        .iter()
+        .map(|m| ListItem::new(format!("{}: {}", m.username, m.message)))
+        .collect();
         let messages =
-            List::new(messages).block(Block::default().borders(Borders::ALL).title("Messages"));
-        f.render_widget(messages, chunks[2]);
+        List::new(messages).block(Block::default().borders(Borders::ALL).title("Messages"));
+        f.render_widget(messages, chunks[3]);
     }
 }
