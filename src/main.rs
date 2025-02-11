@@ -1,21 +1,28 @@
 mod server;
 mod client;
 mod tui;
-use std::io::Write;
 use std::sync::mpsc;
 use std::{env, thread};
 use server::{listen_server, Message};
+use local_ip_address::local_ip;
 
 fn main() {
     let (tx, rx): (mpsc::Sender<Message>, mpsc::Receiver<Message>) = mpsc::channel();
     let port = get_port_from_args();
+    let tx_clone = tx.clone();
     thread::spawn(move || {
-        if let Err(e) = listen_server(tx, port) {
+        if let Err(e) = listen_server(tx_clone, port) {
             eprintln!("Server failed: {}", e);
         }
     });
-    let mut app = tui::App::new("Bruh".to_string());
-    if let Err(err) = app.run(rx) {
+
+    let ip_address = match local_ip() {
+        Ok(ip) => ip.to_string(),
+        Err(_) => "Unknown IP-address".to_string()
+    };
+
+    let mut app = tui::App::new("Bruh".to_string(), format!("{}:{}", ip_address, port));
+    if let Err(err) = app.run(rx, tx) {
         println!("{err}");
     }
 }
