@@ -1,3 +1,8 @@
+# Installatie van Rust
+installeer de Rust compiler [hier](https://rustup.rs/)
+
+Voor een cheat sheet zie deze [site](https://quickref.me/rust.html)
+
 # Workshop
 Deze demo laat zien hoe je een eenvoudige Message Sender applicatie bouwt,
 bestaande uit een server en een client,
@@ -105,7 +110,7 @@ met de tx (sender) en de poort die uit de argumenten komt.
     let mut app = tui::App::new("Ferris".to_string(), format!("{}:{}", ip_address, port));
 ```
 
-## Deel 1: Client
+## Deel 2: Client
 
 ### Stap 6: Verstuur een bericht naar de server
 Open het bestand Cargo.toml en voeg de volgende afhankelijkheden toe:
